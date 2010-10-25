@@ -22,9 +22,9 @@
                 print rates
                 sys.exit()   */
 
-vector< pair<double,double> > blah(vector<double> & gp_out, vector<int> & classes) 
+vector< pair<double, double> > * gen_fpr_tpr(vector<double> & gp_out, vector<int> & classes) 
 {
-	vector< pair<double,double> > rates = new
+	vector< pair<double, double> > rates = new vector< pair<double, double> >;
 	
 	for (int i = 0; i < gp_out.size(); i++){
 		
@@ -47,17 +47,17 @@ vector< pair<double,double> > blah(vector<double> & gp_out, vector<int> & classe
 
                 tpr = tp / (tp + fn);
                 fpr = fp / (tn + fp);
-    		rates.push_back ( make_pair( fpr, tpr ) );
+    		rates->push_back ( make_pair( fpr, tpr ) );
 	}
-	sort ( rates.begin(), rates.end() );
+	sort ( rates->begin(), rates->end() );
 	return rates;
 }
 
 
-double area_under_curve(vector< pair<double,double> > & fpr_tpr)
+double area_under_curve(vector< pair<double, double> > & fpr_tpr)
 {
 	double auc = 0.0;
-	for (int i=0; i < fpr_tpr->size()-1; i++) {
+	for (int i=0; i < fpr_tpr.size()-1; i++) {
 		double x1 = fpr_tpr[i].first,  y1 = fpr_tpr[i].second,
 		       x2 = fpr_tpr[i+1].first,  y2 = fpr_tpr[i+1].second;
 		if (y1 < y2) 

@@ -55,9 +55,58 @@ SymbRegEvalOp::SymbRegEvalOp() :
   mY(0)*/
 { }
 
+vector< pair<Double, Double> > * gen_fpr_tpr(vector< Double > & gp_out, vector<int> & classes)
+{
+        vector< pair<Double, Double> > * rates = new vector< pair<Double, Double> >;
 
-/*!
- *  \brief Evaluate the individual fitness for the symbolic regression problem.
+	Double tpr, fpr, tp, tn, fn, fp, gpo;
+
+        for (int i = 0; i < gp_out.size(); i++){
+
+        	tpr = fpr = 0.0;
+        	tp = tn = fn = fp = 0.0;
+        	gpo = gp_out[i];
+        
+                for (int j = 0; j < gp_out.size(); j++){
+
+                        if (gp_out[j] >= gpo and classes[j] == 1)
+                                tp += 1.0;
+                        else if (gp_out[j] < gpo and classes[j] == 0)
+                                tn += 1.0;
+                        else if (gp_out[j] >= gpo and classes[j] == 0)
+                                fp += 1.0;
+                        else if (gp_out[j] < gpo and classes[j] == 1)
+                                fn += 1.0;
+
+                }
+
+                tpr = tp / (tp + fn);
+                fpr = fp / (tn + fp);
+                rates->push_back ( make_pair( fpr, tpr ) );
+        }
+        sort ( rates->begin(), rates->end() );
+        return rates;
+}
+
+Double area_under_curve(vector< pair<Double, Double> > & fpr_tpr)
+{
+        Double auc = 0.0;
+	Double x1,x2,y1,y2;
+        for (int i=0; i < fpr_tpr.size()-1; i++) {
+                x1 = fpr_tpr[i].first;  
+	 	y1 = fpr_tpr[i].second;
+                x2 = fpr_tpr[i+1].first;  
+		y2 = fpr_tpr[i+1].second;
+                if (y1 < y2)
+                       auc = auc + ((x2-x1)*y1 + ((x2-x1)*(y2-y1))/2.0); 
+                else
+                       auc = auc + ((x2-x1)*y2 + ((x2-x1)*(y1-y2))/2.0);
+
+        }
+        return auc;
+}
+
+ /*  \brief Evaluate the individual fitness for the symbolic regression problem.
  *  \param inIndividual Individual to evaluate.
  *  \param ioContext Evolutionary context.
  *  \return Handle to the fitness measure,
@@ -68,8 +117,8 @@ Fitness::Handle SymbRegEvalOp::evaluate(GP::Individual& inIndividual, GP::Contex
   double hits = 0.0;
   Sample * s;
   int size_training_set = db_samples_training.size(); 
-  double tp = tn = 0.0;
   vector<int> class_samples(size_training_set,0);
+  vector<Double> gpout(size_training_set,0);
   for(unsigned int i=0; i < size_training_set; i++) 
   {
     s = db_samples_training[i];
@@ -110,28 +159,19 @@ Fitness::Handle SymbRegEvalOp::evaluate(GP::Individual& inIndividual, GP::Contex
     Double lResult = 0.0 ;
     inIndividual.run(lResult, ioContext);
 
- /*   if ((lResult >= 0.0 && ISCLASS1((s->type)->c_str())) ||
-	(lResult  < 0.0 && ISCLASS2((s->type)->c_str()))) 
-    {
-	    hits+=1.0;
-    } */
-
-    if (lResult >= 0.0 && ISCLASS1((s->type)->c_str())) {
-	tp += 1.0;
-    }
-    else if (lResult < 0.0 && ISCLASS2((s->type)->c_str()))  {
-	tn += 1.0;
-    }
-
     if (ISCLASS1((s->type)->c_str()))
  	class_samples[i] = 1;
     else
 	class_samples[i] = 0;
+ 
+    gpout[i] = lResult;
 
   }
-  int targets = count(  class_samples.begin(), class_samples.end(), 1 );
-  int outliers = size_training_set - targets;
-  double lFitness = ( pow ((tp/(targets*1.0)),2) + pow((tn/(outliers*1.0)),2) ) / 2.0; 
+  
+  vector< pair<Double, Double> > * fpr_tpr;
+  fpr_tpr = gen_fpr_tpr( gpout, class_samples );
+  Double lFitness = area_under_curve ( *fpr_tpr );
+  delete fpr_tpr;
   return new FitnessSimple(lFitness);
 }
 
@@ -152,7 +192,7 @@ void SymbRegEvalOp::postInit(System& ioSystem)
    GP::EvaluationOp::postInit(ioSystem);
   
    fstream f;
-   f.open("breast/wdbc_B.data.treino5");
+   f.open("breast/wdbc_B.data.treino2");
    while(!f.eof()){
        
 	Sample * s = new Sample();	
