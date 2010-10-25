@@ -55,35 +55,26 @@ SymbRegEvalOp::SymbRegEvalOp() :
   mY(0)*/
 { }
 
-vector< pair<Double, Double> > * gen_fpr_tpr(vector< Double > & gp_out, vector<int> & classes)
+vector< pair<Double, Double> > * gen_fpr_tpr(vector< pair< Double, int> > & gpout_classes, int total_normal, int total_outlier )
 {
         vector< pair<Double, Double> > * rates = new vector< pair<Double, Double> >;
-
-	Double tpr, fpr, tp, tn, fn, fp, gpo;
-
-        for (int i = 0; i < gp_out.size(); i++){
-
-        	tpr = fpr = 0.0;
-        	tp = tn = fn = fp = 0.0;
-        	gpo = gp_out[i];
-        
-                for (int j = 0; j < gp_out.size(); j++){
-
-                        if (gp_out[j] >= gpo and classes[j] == 1)
-                                tp += 1.0;
-                        else if (gp_out[j] < gpo and classes[j] == 0)
-                                tn += 1.0;
-                        else if (gp_out[j] >= gpo and classes[j] == 0)
-                                fp += 1.0;
-                        else if (gp_out[j] < gpo and classes[j] == 1)
-                                fn += 1.0;
-
-                }
-
-                tpr = tp / (tp + fn);
-                fpr = fp / (tn + fp);
-                rates->push_back ( make_pair( fpr, tpr ) );
+	Double tpr, fpr;
+	sort ( gpout_classes.begin(), gpout_classes.end() );
+	int count_normal = 0, count_outlier = 0;
+	for (int i = 0; i < gpout_classes.size()-1; i++){
+		if (gpout_classes[i].second == 1) {
+			tp = total_normal  - (count_normal++);
+			fp = total_outlier - (count_outlier); 
+		}
+		else {
+			tp = total_normal  - count_normal;
+			fp = total_outlier - (count_outlier++); 
+		}
+		tpr = (1.0 * tp) / (1.0 * total_normal);
+		fpr = (1.0 * fp) / (1.0 * total_outlier);
+        	rates->push_back ( make_pair( fpr, tpr ) );
         }
+        rates->push_back ( make_pair( 0.0, 0.0 ) );
         sort ( rates->begin(), rates->end() );
         return rates;
 }
@@ -116,9 +107,10 @@ Fitness::Handle SymbRegEvalOp::evaluate(GP::Individual& inIndividual, GP::Contex
   // double lSquareError = 0.0;
   double hits = 0.0;
   Sample * s;
-  int size_training_set = db_samples_training.size(); 
+  int size_training_set = db_samples_training.size(), total_normal = 0, total_outlier = 0; 
   vector<int> class_samples(size_training_set,0);
   vector<Double> gpout(size_training_set,0);
+  vector< pair<Double, int> > gpout_classes;
   for(unsigned int i=0; i < size_training_set; i++) 
   {
     s = db_samples_training[i];
@@ -159,17 +151,23 @@ Fitness::Handle SymbRegEvalOp::evaluate(GP::Individual& inIndividual, GP::Contex
     Double lResult = 0.0 ;
     inIndividual.run(lResult, ioContext);
 
-    if (ISCLASS1((s->type)->c_str()))
+    if (ISCLASS1((s->type)->c_str())){
  	class_samples[i] = 1;
+	++total_normal;
+    }
     else
+    {	    
 	class_samples[i] = 0;
+	++total_outlier;
+    }
  
     gpout[i] = lResult;
+    gpout_classes.push_back( make_pair(lResult, class_samples[i]) );
 
   }
   
   vector< pair<Double, Double> > * fpr_tpr;
-  fpr_tpr = gen_fpr_tpr( gpout, class_samples );
+  fpr_tpr = gen_fpr_tpr( gpout_classes, total_normal, total_outlier );
   Double lFitness = area_under_curve ( *fpr_tpr );
   delete fpr_tpr;
   return new FitnessSimple(lFitness);
