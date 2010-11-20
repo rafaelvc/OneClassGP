@@ -74,7 +74,7 @@ vector< pair<Double, Double> > * gen_fpr_tpr(vector< pair< Double, int> > & gpou
 		fpr = (1.0 * fp) / (1.0 * total_outlier);
         	rates->push_back ( make_pair( fpr, tpr ) );
         }
-        rates->push_back ( make_pair( 0.0, 0.0 ) );
+        rates->push_back ( make_pair( 0.0, 0.0 ) ); // What is this line for ?
         sort ( rates->begin(), rates->end() );
         return rates;
 }
